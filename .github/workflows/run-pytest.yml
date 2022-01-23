@@ -1,0 +1,47 @@
+name: run-tests
+
+on:
+  push:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.8']
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+    - name: Extract test files
+      run: ./.github/scripts/extract_files.sh
+      env:
+        FILES_PASSPHRASE: ${{ secrets.FILES_PASSPHRASE }}
+    - name: Install and configure poetry
+      uses: snok/install-poetry@v1.1.4
+      with:
+        version: 1.1.6
+        virtualenvs-create: false
+    - name: Install dependencies
+      run: poetry install -E mupdf
+      if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
+    - name: Test with pytest
+      run: |
+        pytest
+      env:
+        BAD_CAS_FILE: ${{ secrets.BAD_CAS_FILE }}
+        CAMS_CAS_FILE: ${{ secrets.CAMS_CAS_FILE }}
+        CAMS_CAS_SUMMARY: ${{ secrets.CAMS_CAS_SUMMARY }}
+        CAMS_CAS_PASSWORD: ${{ secrets.CAMS_CAS_PASSWORD }}
+        KFINTECH_CAS_FILE: ${{ secrets.KFINTECH_CAS_FILE }}
+        KFINTECH_CAS_PASSWORD: ${{ secrets.KFINTECH_CAS_PASSWORD }}
+    - name: Upload coverage report to codecov
+      uses: codecov/codecov-action@v1
+      with:
+        file: ./coverage.xml
